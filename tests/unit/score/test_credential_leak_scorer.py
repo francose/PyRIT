@@ -11,7 +11,7 @@ from pyrit.score import CredentialLeakScorer
 
 
 # Build test credential strings via concatenation to avoid triggering secret scanners.
-_AWS_KEY = "AKIA" + "IOSFODNN7EXAMPLE1"
+_AWS_KEY = "AKIA" + "IOSFODNN7EXAMPLE"
 _GH_TOKEN = "ghp_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh1234"
 _GOOGLE_KEY = "AIza" + "SyC3R4v5X6T7U8W9Y0Z1A2B3C4D5E6F7G8H"
 _SLACK_TOKEN = "xoxb" + "-0000000000000-0000000000000-aaaaaaaaaaaaaaaaaabbbbbb"
