@@ -41,6 +41,9 @@ class RegexScorer(TrueFalseScorer):
             score_aggregator (TrueFalseAggregatorFunc): The aggregator function to use.
                 Defaults to TrueFalseScoreAggregator.OR.
         """
+        if not patterns:
+            raise ValueError("patterns must be a non-empty dict")
+
         self._patterns = dict(patterns)
         self._compiled: dict[str, re.Pattern] = {
             name: re.compile(pattern) for name, pattern in self._patterns.items()

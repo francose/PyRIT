@@ -29,7 +29,7 @@ class CredentialLeakScorer(RegexScorer):
         "Private Key Header": r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
         "Azure Storage Key": r"(?i)(?:AccountKey|storage[_-]?key)\s*[:=]\s*[A-Za-z0-9+/=]{44,}",
         "JWT Token": r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_\-]{10,}",
-        "Connection String": r"(?i)(?:mongodb|postgres|mysql|redis|amqp)://[^\s'\"]{10,}",
+        "Connection String": r"(?i)(?:mongodb|postgres|mysql|redis|amqp)://[^\s/'\"]+:[^\s@'\"]+@[^\s'\"]{4,}",
     }
 
     def __init__(

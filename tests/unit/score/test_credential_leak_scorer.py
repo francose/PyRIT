@@ -71,6 +71,18 @@ async def test_credential_scorer_custom_patterns(patch_central_database):
     assert score.get_value() is False
 
 
+async def test_connection_string_without_credentials_not_detected(patch_central_database):
+    scorer = CredentialLeakScorer()
+    score = (await scorer.score_text_async("postgres://localhost:5432/mydb"))[0]
+    assert score.get_value() is False
+
+
+async def test_connection_string_with_credentials_detected(patch_central_database):
+    scorer = CredentialLeakScorer()
+    score = (await scorer.score_text_async("postgres://admin:secretpass@prod-db:5432/mydb"))[0]
+    assert score.get_value() is True
+
+
 async def test_credential_scorer_adds_to_memory():
     memory = MagicMock(MemoryInterface)
     with patch.object(CentralMemory, "get_memory_instance", return_value=memory):

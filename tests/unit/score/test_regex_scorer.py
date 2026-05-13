@@ -42,3 +42,8 @@ async def test_regex_scorer_categories_propagate(patch_central_database):
     scorer = RegexScorer(patterns=_TEST_PATTERNS, categories=["pii"])
     score = (await scorer.score_text_async(text="SSN is 123-45-6789"))[0]
     assert "pii" in score.score_category
+
+
+def test_regex_scorer_rejects_empty_patterns():
+    with pytest.raises(ValueError, match="non-empty"):
+        RegexScorer(patterns={})
