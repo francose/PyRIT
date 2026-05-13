@@ -43,6 +43,7 @@ from pyrit.score.true_false.float_scale_threshold_scorer import FloatScaleThresh
 from pyrit.score.true_false.gandalf_scorer import GandalfScorer
 from pyrit.score.true_false.credential_leak_scorer import CredentialLeakScorer
 from pyrit.score.true_false.markdown_injection import MarkdownInjectionScorer
+from pyrit.score.true_false.regex_scorer import RegexScorer
 from pyrit.score.true_false.prompt_shield_scorer import PromptShieldScorer
 from pyrit.score.true_false.question_answer_scorer import QuestionAnswerScorer
 from pyrit.score.true_false.self_ask_category_scorer import ContentClassifierPaths, SelfAskCategoryScorer
@@ -140,6 +141,7 @@ __all__ = [
     "PlagiarismScorer",
     "PromptShieldScorer",
     "QuestionAnswerScorer",
+    "RegexScorer",
     "RegistryUpdateBehavior",
     "Scorer",
     "ScorerEvalDatasetFiles",
