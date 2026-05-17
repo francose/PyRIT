@@ -40,6 +40,9 @@ class RegexScorer(TrueFalseScorer):
             validator (ScorerPromptValidator | None): Custom validator. Defaults to None.
             score_aggregator (TrueFalseAggregatorFunc): The aggregator function to use.
                 Defaults to TrueFalseScoreAggregator.OR.
+
+        Raises:
+            ValueError: If patterns is empty.
         """
         if not patterns:
             raise ValueError("patterns must be a non-empty dict")
