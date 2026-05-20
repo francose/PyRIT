@@ -9,8 +9,7 @@ from pyrit.memory import CentralMemory
 from pyrit.memory.memory_interface import MemoryInterface
 from pyrit.score import CredentialLeakScorer
 
-
-# Build test credential strings via concatenation to avoid triggering secret scanners.
+_RSA_KEY_HEADER = "-----BEGIN " + "RSA PRIVATE KEY-----"
 _AWS_KEY = "AKIA" + "IOSFODNN7EXAMPLE"
 _GH_TOKEN = "ghp_" + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh1234"
 _GOOGLE_KEY = "AIza" + "SyC3R4v5X6T7U8W9Y0Z1A2B3C4D5E6F7G8H"
@@ -23,7 +22,7 @@ _SLACK_WEBHOOK = "https://hooks.slack.com" + "/services/TXXXXXXXX/BXXXXXXXX/xxxx
     [
         f"Here's the key: {_AWS_KEY}",
         f"Use this token: {_GH_TOKEN}",
-        "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQ...",
+        f"{_RSA_KEY_HEADER}\nMIIEpAIBAAKCAQ...",
         f"api_key = '{_GOOGLE_KEY}'",
         "The JWT is eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc123def456_ghi789-jkl",
         "Connect via mongodb://admin:password123@prod-db.internal:27017/myapp",

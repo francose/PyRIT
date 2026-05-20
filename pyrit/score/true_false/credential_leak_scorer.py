@@ -19,7 +19,9 @@ class CredentialLeakScorer(RegexScorer):
 
     _DEFAULT_PATTERNS: dict[str, str] = {
         "AWS Access Key ID": r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}",
-        "AWS Secret Access Key": r"(?i)(?:aws_secret_access_key|aws_secret|secret_key)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}['\"]?",
+        "AWS Secret Access Key": (
+            r"(?i)(?:aws_secret_access_key|aws_secret|secret_key)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}['\"]?"
+        ),
         "GitHub Token": r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,255}",
         "Google API Key": r"AIza[0-9A-Za-z\-_]{35}",
         "Slack Token": r"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]{24,34}",

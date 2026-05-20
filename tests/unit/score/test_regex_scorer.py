@@ -1,14 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pyrit.memory import CentralMemory
-from pyrit.memory.memory_interface import MemoryInterface
 from pyrit.score import RegexScorer
-
 
 _TEST_PATTERNS = {
     "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
