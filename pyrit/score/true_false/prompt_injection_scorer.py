@@ -49,13 +49,13 @@ class PromptInjectionScorer(RegexScorer):
             r"|filters?|guardrails?|safety|censorship|moderation)\b"
         ),
         "Chat Template Injection": (
-            r"(?:\[/?INST\]|<</?SYS>>|<\|im_start\|>|<\|im_end\|>"
+            r"(?i)(?:\[/?INST\]|<</?SYS>>|<\|im_start\|>|<\|im_end\|>"
             r"|<\|system\|>|<\|user\|>|<\|assistant\|>|<\|endoftext\|>"
             r"|<\|pad\|>|</?s>|\[SYSTEM\]|\[USER\]|\[ASSISTANT\])"
         ),
         "Encoding Evasion Request": (
             r"(?i)\b(?:decode|interpret|execute|follow|run|process|translate|evaluate)"
-            r"\b.{0,30}\b(?:base64|rot13|hex(?:adecimal)?|url.?encod|unicode|ascii"
+            r"\b.{0,30}\b(?:base64|rot13|hex(?:adecimal)?|url.?encod(?:e|ed|ing|er)?|unicode|ascii"
             r"|morse|binary|caesar|atbash)\b.{0,30}\b(?:instructions?|commands?|messages?|texts?|prompts?|payloads?)\b"
         ),
         "Prompt Leaking": (
