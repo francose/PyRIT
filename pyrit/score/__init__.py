@@ -44,7 +44,6 @@ from pyrit.score.true_false.decoding_scorer import DecodingScorer
 from pyrit.score.true_false.float_scale_threshold_scorer import FloatScaleThresholdScorer
 from pyrit.score.true_false.gandalf_scorer import GandalfScorer
 from pyrit.score.true_false.markdown_injection import MarkdownInjectionScorer
-from pyrit.score.true_false.prompt_injection_scorer import PromptInjectionScorer
 from pyrit.score.true_false.prompt_shield_scorer import PromptShieldScorer
 from pyrit.score.true_false.question_answer_scorer import QuestionAnswerScorer
 from pyrit.score.true_false.regex_scorer import RegexScorer
@@ -57,6 +56,7 @@ from pyrit.score.true_false.self_ask_true_false_scorer import (
     TrueFalseQuestion,
     TrueFalseQuestionPaths,
 )
+from pyrit.score.true_false.static_prompt_injection_scorer import StaticPromptInjectionScorer
 from pyrit.score.true_false.substring_scorer import SubStringScorer
 from pyrit.score.true_false.true_false_composite_scorer import TrueFalseCompositeScorer
 from pyrit.score.true_false.true_false_inverter_scorer import TrueFalseInverterScorer
@@ -141,7 +141,6 @@ __all__ = [
     "ObjectiveScorerMetrics",
     "PlagiarismMetric",
     "PlagiarismScorer",
-    "PromptInjectionScorer",
     "PromptShieldScorer",
     "QuestionAnswerScorer",
     "RegexScorer",
@@ -165,6 +164,7 @@ __all__ = [
     "SelfAskScaleScorer",
     "SelfAskTrueFalseScorer",
     "ScorerPrinter",
+    "StaticPromptInjectionScorer",
     "SubStringScorer",
     "TrueFalseCompositeScorer",
     "TrueFalseInverterScorer",
