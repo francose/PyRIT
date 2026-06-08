@@ -1,13 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import asyncio
 import logging
 import pathlib
 import uuid
-import zipfile
 from enum import Enum
 from typing import Literal
 
+from pyrit.common.safe_extract import safe_extract_zip
 from pyrit.datasets.seed_datasets.remote.remote_dataset_loader import (
     _RemoteDatasetLoader,
 )
@@ -149,8 +150,7 @@ class _JailbreakV28KDataset(_RemoteDatasetLoader):
         # Only unzip if the target directory does not already exist
         if not zip_extracted_path.exists():
             logger.info(f"Extracting {zip_file_path} to {self.zip_dir}")
-            with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
-                zip_ref.extractall(self.zip_dir)
+            await asyncio.to_thread(safe_extract_zip, source=zip_file_path, dest_dir=self.zip_dir)
 
         try:
             logger.info(f"Loading JailBreakV-28K dataset from {self.source}")
