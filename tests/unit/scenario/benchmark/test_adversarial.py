@@ -48,7 +48,7 @@ from pyrit.models import (
 )
 from pyrit.prompt_target import PromptTarget
 from pyrit.registry import TargetRegistry
-from pyrit.registry.object_registries.attack_technique_registry import AttackTechniqueRegistry
+from pyrit.registry.components.attack_technique_registry import AttackTechniqueRegistry
 from pyrit.scenario.core import BaselineAttackPolicy
 from pyrit.scenario.core.attack_technique_factory import AttackTechniqueFactory
 from pyrit.scenario.core.scenario import Scenario
@@ -71,14 +71,14 @@ def _build_benchmarkable_factories_snapshot() -> list:
     factory construction does not depend on environment variables, then filters
     by the same predicate used in ``AdversarialBenchmark._get_benchmarkable_factories``.
     """
-    TargetRegistry.reset_instance()
+    TargetRegistry.reset_registry_singleton()
     adv = MagicMock(spec=PromptTarget)
     adv.capabilities.includes.return_value = True
-    TargetRegistry.get_registry_singleton().register_instance(adv, name="adversarial_chat")
+    TargetRegistry.get_registry_singleton().instances.register(adv, name="adversarial_chat")
     try:
         factories = build_scenario_technique_factories()
     finally:
-        TargetRegistry.reset_instance()
+        TargetRegistry.reset_registry_singleton()
     return [f for f in factories if f.uses_adversarial and "core" in f.strategy_tags]
 
 
@@ -101,18 +101,18 @@ def reset_technique_registry():
     resolves without depending on environment variables. Uses ``_build_benchmark_strategy.cache_clear()``
     because our implementation uses ``@cache`` (not ``_cached_strategy_class``).
     """
-    AttackTechniqueRegistry.reset_instance()
-    TargetRegistry.reset_instance()
+    AttackTechniqueRegistry.reset_registry_singleton()
+    TargetRegistry.reset_registry_singleton()
     _build_benchmark_strategy.cache_clear()
 
     adv_target = MagicMock(spec=PromptTarget)
     adv_target.capabilities.includes.return_value = True
-    TargetRegistry.get_registry_singleton().register_instance(adv_target, name="adversarial_chat")
+    TargetRegistry.get_registry_singleton().instances.register(adv_target, name="adversarial_chat")
 
     AttackTechniqueRegistry.get_registry_singleton().register_from_factories(build_scenario_technique_factories())
     yield
-    AttackTechniqueRegistry.reset_instance()
-    TargetRegistry.reset_instance()
+    AttackTechniqueRegistry.reset_registry_singleton()
+    TargetRegistry.reset_registry_singleton()
     _build_benchmark_strategy.cache_clear()
 
 
@@ -120,7 +120,7 @@ def _register_adversarial_target(*, name: str) -> PromptTarget:
     """Register a mock adversarial target in TargetRegistry."""
     target = MagicMock(spec=PromptTarget)
     registry = TargetRegistry.get_registry_singleton()
-    registry.register_instance(target, name=name)
+    registry.instances.register(target, name=name)
     return target
 
 
@@ -131,7 +131,11 @@ def _register_mock_factory(*, name: str, tags: list[str] | None = None, seed_tec
     factory.uses_adversarial = True
     factory.strategy_tags = tags if tags is not None else ["core", "light"]
     factory.seed_technique = seed_technique
-    factory.create.return_value = MagicMock(name="AttackTechnique")
+    technique_instance = MagicMock(name="AttackTechnique")
+    technique_instance.get_identifier.return_value = ComponentIdentifier(
+        class_name="MockTechnique", class_module="pyrit.test"
+    )
+    factory.create.return_value = technique_instance
     factory.attack_class = MagicMock(__name__=name)
     AttackTechniqueRegistry.get_registry_singleton().register_from_factories([factory])
     return factory
@@ -216,7 +220,21 @@ class TestAdversarialBenchmarkStrategy:
         member_values = {m.value for m in strategy_cls}
         assert "prompt_sending" not in member_values
 
-    def test_strategy_includes_required_aggregates(self):
+    def test_strategy_excludes_factories_with_baked_adversarial_chat(self):
+        """Adversarial factories that bake their own ``adversarial_chat`` are not swept."""
+        baked = MagicMock(spec=AttackTechniqueFactory)
+        baked.name = "pinned_adversary"
+        baked.uses_adversarial = True
+        baked.strategy_tags = ["core", "light"]
+        baked.seed_technique = None
+        baked.attack_class = MagicMock(__name__="pinned_adversary")
+        baked.adversarial_chat = MagicMock()
+        baked.create.return_value = MagicMock()
+        AttackTechniqueRegistry.get_registry_singleton().register_from_factories([baked])
+
+        strategy_cls = _build_benchmark_strategy()
+        member_values = {m.value for m in strategy_cls}
+        assert "pinned_adversary" not in member_values
         """The strategy enum exposes ``light``, ``single_turn``, ``multi_turn`` aggregates."""
         strategy_cls = _build_benchmark_strategy()
         aggregates = strategy_cls.get_aggregate_tags()
@@ -400,7 +418,7 @@ class TestGetAtomicAttacksCrossProduct:
             _register_adversarial_target(name=name)
         # Reset the technique registry so we can register a controllable mock factory
         # whose create() return value we can inspect.
-        AttackTechniqueRegistry.reset_instance()
+        AttackTechniqueRegistry.reset_registry_singleton()
         _build_benchmark_strategy.cache_clear()
         _register_mock_factory(name="red_teaming", tags=["core", "light"])
         bench = AdversarialBenchmark(objective_scorer=MagicMock(spec=TrueFalseScorer))
@@ -414,7 +432,7 @@ class TestGetAtomicAttacksCrossProduct:
         # Dataset config: one dataset with one real seed group (AtomicAttack hashes objectives).
         seed_group = SeedAttackGroup(seeds=[SeedObjective(value="benchmark_objective_1")])
         bench._dataset_config = MagicMock()
-        bench._dataset_config.get_seed_attack_groups.return_value = {"harmbench": [seed_group]}
+        bench._dataset_config.get_attack_groups_by_dataset_async = AsyncMock(return_value={"harmbench": [seed_group]})
 
         return bench
 
@@ -445,9 +463,9 @@ class TestGetAtomicAttacksCrossProduct:
         target._underlying_model = "another-model-identity"
         target._endpoint = "https://hijacked.example.com/openai/v1"
         target.name = "name-attribute-that-must-not-leak"
-        TargetRegistry.get_registry_singleton().register_instance(target, name="adv_a")
+        TargetRegistry.get_registry_singleton().instances.register(target, name="adv_a")
         # Reset the technique registry to get a controllable mock factory
-        AttackTechniqueRegistry.reset_instance()
+        AttackTechniqueRegistry.reset_registry_singleton()
         _build_benchmark_strategy.cache_clear()
         _register_mock_factory(name="red_teaming", tags=["core", "light"])
 
@@ -461,7 +479,7 @@ class TestGetAtomicAttacksCrossProduct:
 
         seed_group = SeedAttackGroup(seeds=[SeedObjective(value="display_group_regression_objective")])
         bench._dataset_config = MagicMock()
-        bench._dataset_config.get_seed_attack_groups.return_value = {"harmbench": [seed_group]}
+        bench._dataset_config.get_attack_groups_by_dataset_async = AsyncMock(return_value={"harmbench": [seed_group]})
 
         result = await bench._get_atomic_attacks_async()
 
@@ -472,8 +490,8 @@ class TestGetAtomicAttacksCrossProduct:
         )
         assert atomic.atomic_attack_name == "red_teaming__adv_a_harmbench"
 
-    async def test_factory_create_called_per_target_with_adversarial_config_override(self):
-        """Each (factory, target) pair calls ``factory.create`` with an ``AttackAdversarialConfig`` override."""
+    async def test_factory_create_called_per_target_with_adversarial_chat(self):
+        """Each (factory, target) pair calls ``factory.create`` with an ``adversarial_chat`` target."""
         bench = self._make_bench_with_targets(target_names=["adv_a", "adv_b"])
         factory = AttackTechniqueRegistry.get_registry_singleton().get_factories_or_raise()["red_teaming"]
 
@@ -481,11 +499,9 @@ class TestGetAtomicAttacksCrossProduct:
 
         # 1 factory × 2 targets × 1 dataset = 2 create calls
         assert factory.create.call_count == 2
-        target_a = TargetRegistry.get_registry_singleton().get_instance_by_name("adv_a")
-        target_b = TargetRegistry.get_registry_singleton().get_instance_by_name("adv_b")
-        injected_targets = {
-            call.kwargs["attack_adversarial_config_override"].target for call in factory.create.call_args_list
-        }
+        target_a = TargetRegistry.get_registry_singleton().instances.get("adv_a")
+        target_b = TargetRegistry.get_registry_singleton().instances.get("adv_b")
+        injected_targets = {call.kwargs["adversarial_chat"] for call in factory.create.call_args_list}
         assert injected_targets == {target_a, target_b}
 
 
@@ -733,7 +749,7 @@ class TestSkipCachedFilter:
     def _make_bench(self, *, use_cached: bool) -> AdversarialBenchmark:
         _register_adversarial_target(name="adv_a")
         # Reset the technique registry to get a controllable mock factory
-        AttackTechniqueRegistry.reset_instance()
+        AttackTechniqueRegistry.reset_registry_singleton()
         _build_benchmark_strategy.cache_clear()
         _register_mock_factory(name="red_teaming", tags=["core", "light"])
         bench = AdversarialBenchmark(
@@ -750,7 +766,7 @@ class TestSkipCachedFilter:
 
         seed_group = SeedAttackGroup(seeds=[SeedObjective(value="skip_cached_objective")])
         bench._dataset_config = MagicMock()
-        bench._dataset_config.get_seed_attack_groups.return_value = {"harmbench": [seed_group]}
+        bench._dataset_config.get_attack_groups_by_dataset_async = AsyncMock(return_value={"harmbench": [seed_group]})
 
         return bench
 

@@ -106,7 +106,7 @@ class ScenarioStrategy(Enum, metaclass=_DeprecatedEnumMeta):
     @property
     def tags(self) -> set[str]:
         """
-        Get the tags for this attack strategy.
+        The tags for this attack strategy.
 
         Tags provide a flexible categorization system, allowing strategies
         to be classified along multiple dimensions (e.g., by complexity, type, or technique).
@@ -189,32 +189,6 @@ class ScenarioStrategy(Enum, metaclass=_DeprecatedEnumMeta):
         """
         aggregate_tags = cls.get_aggregate_tags()
         return [s for s in cls if s.value in aggregate_tags]
-
-    @classmethod
-    def normalize_strategies(cls: type[T], strategies: set[T]) -> set[T]:
-        """
-        Normalize a set of attack strategies by expanding aggregate tags.
-
-        This method processes a set of strategies and expands any aggregate tags
-        (like EASY, MODERATE, DIFFICULT or FAST, MEDIUM) into their constituent concrete strategies.
-        The aggregate tag markers themselves are removed from the result.
-
-        The special "all" tag is automatically supported and expands to all non-aggregate strategies.
-
-        Args:
-            strategies (set[T]): The initial set of attack strategies, which may include
-                                aggregate tags.
-
-        Returns:
-            set[T]: The normalized set of concrete attack strategies with aggregate tags
-                   expanded and removed.
-        """
-        print_deprecation_message(
-            old_item="ScenarioStrategy.normalize_strategies",
-            new_item="ScenarioStrategy.expand",
-            removed_in="0.15.0",
-        )
-        return set(cls.expand(strategies))
 
     @classmethod
     def expand(cls: type[T], strategies: set[T]) -> list[T]:
@@ -352,12 +326,12 @@ class ScenarioCompositeStrategy:
 
     @property
     def name(self) -> str:
-        """Get the name of the composite strategy."""
+        """The name of the composite strategy."""
         return self._name
 
     @property
     def strategies(self) -> list[ScenarioStrategy]:
-        """Get the list of strategies in this composition."""
+        """The list of strategies in this composition."""
         return self._strategies
 
     @property

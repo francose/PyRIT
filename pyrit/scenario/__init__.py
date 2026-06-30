@@ -18,21 +18,25 @@ import pkgutil
 import sys
 from types import ModuleType
 
-from pyrit.common.parameter import Parameter
-from pyrit.models.scenario_result import ScenarioIdentifier, ScenarioResult
+from pyrit.models import ScenarioIdentifier, ScenarioResult
+from pyrit.models.parameter import Parameter
 from pyrit.scenario.core import (
     AtomicAttack,
     AttackTechnique,
     AttackTechniqueFactory,
     BaselineAttackPolicy,
+    CompoundDatasetAttackConfiguration,
+    DatasetAttackConfiguration,
     DatasetConfiguration,
+    DatasetSourceKind,
+    ResolvedDataset,
     Scenario,
     ScenarioCompositeStrategy,
     ScenarioStrategy,
 )
 
 # Import scenario submodules directly and register them as virtual subpackages
-# This allows: from pyrit.scenario.airt import ContentHarms
+# This allows: from pyrit.scenario.airt import Jailbreak
 # without needing separate pyrit/scenario/airt/ directories
 from pyrit.scenario.scenarios import adaptive as _adaptive_module
 from pyrit.scenario.scenarios import airt as _airt_module
@@ -79,8 +83,12 @@ __all__ = [
     "AttackTechnique",
     "AttackTechniqueFactory",
     "BaselineAttackPolicy",
+    "CompoundDatasetAttackConfiguration",
+    "DatasetAttackConfiguration",
     "DatasetConfiguration",
+    "DatasetSourceKind",
     "Parameter",
+    "ResolvedDataset",
     "Scenario",
     "ScenarioCompositeStrategy",
     "ScenarioStrategy",

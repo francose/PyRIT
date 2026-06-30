@@ -4,7 +4,7 @@
 """Tests for the RapidResponse scenario (refactored from ContentHarms)."""
 
 import pathlib
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -19,9 +19,11 @@ from pyrit.executor.attack import (
 from pyrit.models import ComponentIdentifier, SeedAttackGroup, SeedObjective, SeedPrompt
 from pyrit.prompt_target import PromptTarget
 from pyrit.registry import TargetRegistry
-from pyrit.registry.object_registries.attack_technique_registry import AttackTechniqueRegistry
+from pyrit.registry.components.attack_technique_registry import AttackTechniqueRegistry
 from pyrit.scenario.core.attack_technique_factory import AttackTechniqueFactory
-from pyrit.scenario.core.dataset_configuration import DatasetConfiguration
+from pyrit.scenario.core.dataset_configuration import (
+    CompoundDatasetAttackConfiguration,
+)
 from pyrit.scenario.scenarios.airt.rapid_response import (
     RapidResponse,
 )
@@ -88,19 +90,19 @@ def reset_technique_registry():
     """
     from pyrit.scenario.scenarios.airt.rapid_response import _build_rapid_response_strategy
 
-    AttackTechniqueRegistry.reset_instance()
-    TargetRegistry.reset_instance()
+    AttackTechniqueRegistry.reset_registry_singleton()
+    TargetRegistry.reset_registry_singleton()
     _build_rapid_response_strategy.cache_clear()
 
     adv_target = MagicMock(spec=PromptTarget)
     adv_target.capabilities.includes.return_value = True
-    TargetRegistry.get_registry_singleton().register_instance(adv_target, name="adversarial_chat")
+    TargetRegistry.get_registry_singleton().instances.register(adv_target, name="adversarial_chat")
 
     technique_registry = AttackTechniqueRegistry.get_registry_singleton()
     technique_registry.register_from_factories(build_scenario_technique_factories())
     yield
-    AttackTechniqueRegistry.reset_instance()
-    TargetRegistry.reset_instance()
+    AttackTechniqueRegistry.reset_registry_singleton()
+    TargetRegistry.reset_registry_singleton()
     _build_rapid_response_strategy.cache_clear()
 
 
@@ -175,8 +177,8 @@ class TestRapidResponseBasic:
             "pyrit.scenario.core.scenario.Scenario._get_default_objective_scorer", return_value=mock_objective_scorer
         ):
             config = RapidResponse()._default_dataset_config
-        assert isinstance(config, DatasetConfiguration)
-        names = config.get_default_dataset_names()
+        assert isinstance(config, CompoundDatasetAttackConfiguration)
+        names = config.dataset_names
         expected = [f"airt_{cat}" for cat in ALL_HARM_CATEGORIES]
         for name in expected:
             assert name in names
@@ -187,7 +189,7 @@ class TestRapidResponseBasic:
             "pyrit.scenario.core.scenario.Scenario._get_default_objective_scorer", return_value=mock_objective_scorer
         ):
             config = RapidResponse()._default_dataset_config
-        assert config.max_dataset_size == 4
+        assert all(child.max_dataset_size == 4 for child in config._configurations)
 
     @patch("pyrit.scenario.core.scenario.Scenario._get_default_objective_scorer")
     def test_initialization_minimal(self, mock_get_scorer, mock_objective_scorer):
@@ -202,7 +204,12 @@ class TestRapidResponseBasic:
         assert scenario._objective_scorer == mock_objective_scorer
 
     @patch("pyrit.scenario.core.scenario.Scenario._get_default_objective_scorer")
-    @patch.object(DatasetConfiguration, "get_seed_attack_groups", return_value=ALL_HARM_SEED_GROUPS)
+    @patch.object(
+        CompoundDatasetAttackConfiguration,
+        "get_attack_groups_by_dataset_async",
+        new_callable=AsyncMock,
+        return_value=ALL_HARM_SEED_GROUPS,
+    )
     async def test_initialization_defaults_to_default_strategy(
         self,
         _mock_groups,
@@ -221,11 +228,22 @@ class TestRapidResponseBasic:
         scenario = RapidResponse(
             objective_scorer=mock_objective_scorer,
         )
-        with pytest.raises(ValueError, match="DatasetConfiguration has no seed_groups"):
-            await scenario.initialize_async(objective_target=mock_objective_target)
+        # Neutralize the provider fetch so the empty-memory path raises loudly instead of fetching
+        # the real default dataset from the provider.
+        with patch(
+            "pyrit.scenario.core.dataset_configuration.DatasetConfiguration._fetch_dataset_async",
+            new_callable=AsyncMock,
+        ):
+            with pytest.raises(ValueError, match="could not be loaded"):
+                await scenario.initialize_async(objective_target=mock_objective_target)
 
     @patch("pyrit.scenario.core.scenario.Scenario._get_default_objective_scorer")
-    @patch.object(DatasetConfiguration, "get_seed_attack_groups", return_value=ALL_HARM_SEED_GROUPS)
+    @patch.object(
+        CompoundDatasetAttackConfiguration,
+        "get_attack_groups_by_dataset_async",
+        new_callable=AsyncMock,
+        return_value=ALL_HARM_SEED_GROUPS,
+    )
     async def test_memory_labels_stored(
         self,
         _mock_groups,
@@ -264,7 +282,12 @@ class TestRapidResponseAttackGeneration:
     ):
         """Helper: initialize scenario and return atomic attacks."""
         groups = seed_groups or {"hate": _make_seed_groups("hate")}
-        with patch.object(DatasetConfiguration, "get_seed_attack_groups", return_value=groups):
+        with patch.object(
+            CompoundDatasetAttackConfiguration,
+            "get_attack_groups_by_dataset_async",
+            new_callable=AsyncMock,
+            return_value=groups,
+        ):
             scenario = RapidResponse(
                 objective_scorer=mock_objective_scorer,
             )
@@ -400,7 +423,7 @@ class TestRapidResponseAttackGeneration:
 
         # Reset the registry and register only prompt_sending — the other techniques
         # (role_play, many_shot, tap) won't have factories.
-        AttackTechniqueRegistry.reset_instance()
+        AttackTechniqueRegistry.reset_registry_singleton()
         RapidResponse._cached_strategy_class = None
         registry = AttackTechniqueRegistry.get_registry_singleton()
         registry.register_technique(
@@ -413,7 +436,12 @@ class TestRapidResponseAttackGeneration:
             tags=["core", "single_turn"],
         )
 
-        with patch.object(DatasetConfiguration, "get_seed_attack_groups", return_value=groups):
+        with patch.object(
+            CompoundDatasetAttackConfiguration,
+            "get_attack_groups_by_dataset_async",
+            new_callable=AsyncMock,
+            return_value=groups,
+        ):
             scenario = RapidResponse(
                 objective_scorer=mock_objective_scorer,
             )
@@ -489,65 +517,19 @@ class TestCoreTechniques:
         factories = scenario._get_attack_technique_factories()
         assert factories["role_play"].uses_adversarial is True
         assert factories["tap"].uses_adversarial is True
-        assert factories["role_play"]._adversarial_config is None
-        assert factories["tap"]._adversarial_config is None
+        assert factories["role_play"]._adversarial_chat is None
+        assert factories["tap"]._adversarial_chat is None
 
     def test_factories_always_use_default_adversarial(self, mock_objective_scorer):
         """Factories defer adversarial wiring to create()-time lazy resolution."""
         scenario = RapidResponse(objective_scorer=mock_objective_scorer)
         factories = scenario._get_attack_technique_factories()
 
-        assert factories["role_play"]._adversarial_config is None
-        assert factories["tap"]._adversarial_config is None
+        assert factories["role_play"]._adversarial_chat is None
+        assert factories["tap"]._adversarial_chat is None
 
 
 # ===========================================================================
-# Deprecated alias tests
-# ===========================================================================
-
-
-@pytest.mark.usefixtures(*FIXTURES)
-class TestDeprecatedAliases:
-    """Tests for backward-compatible ContentHarms aliases."""
-
-    def test_content_harms_is_rapid_response(self):
-        with pytest.warns(DeprecationWarning, match="ContentHarms"):
-            from pyrit.scenario.scenarios.airt.content_harms import ContentHarms
-
-        assert ContentHarms is RapidResponse
-
-    def test_content_harms_strategy_is_rapid_response_strategy(self):
-        with pytest.warns(DeprecationWarning, match="ContentHarmsStrategy"):
-            from pyrit.scenario.scenarios.airt.content_harms import ContentHarmsStrategy
-
-        assert ContentHarmsStrategy is _strategy_class()
-
-    def test_content_harms_instance_name_is_rapid_response(self, mock_objective_scorer):
-        """ContentHarms() creates a RapidResponse with name 'RapidResponse'."""
-        with pytest.warns(DeprecationWarning, match="ContentHarms"):
-            from pyrit.scenario.scenarios.airt.content_harms import ContentHarms
-
-        scenario = ContentHarms(
-            objective_scorer=mock_objective_scorer,
-        )
-        assert scenario.name == "RapidResponse"
-        assert isinstance(scenario, RapidResponse)
-
-    def test_content_harms_via_airt_package_emits_deprecation_warning(self):
-        """Importing ``ContentHarms`` from the parent ``airt`` package emits the warning."""
-        with pytest.warns(DeprecationWarning, match="ContentHarms"):
-            from pyrit.scenario.scenarios.airt import ContentHarms
-
-        assert ContentHarms is RapidResponse
-
-    def test_content_harms_strategy_via_airt_package_emits_deprecation_warning(self):
-        """Importing ``ContentHarmsStrategy`` from the parent ``airt`` package emits the warning."""
-        with pytest.warns(DeprecationWarning, match="ContentHarmsStrategy"):
-            from pyrit.scenario.scenarios.airt import ContentHarmsStrategy
-
-        assert ContentHarmsStrategy is _strategy_class()
-
-
 # ===========================================================================
 # Registry integration tests
 # ===========================================================================
@@ -560,7 +542,7 @@ class TestRegistryIntegration:
     def test_registry_populated_by_autouse_fixture(self):
         """The autouse fixture registers all canonical scenario techniques."""
         registry = AttackTechniqueRegistry.get_registry_singleton()
-        names = set(registry.get_names())
+        names = set(registry.instances.get_names())
         assert {"role_play", "many_shot", "tap"} <= names
 
     def test_register_from_factories_idempotent(self):
@@ -568,7 +550,7 @@ class TestRegistryIntegration:
         registry = AttackTechniqueRegistry.get_registry_singleton()
         expected = len(build_scenario_technique_factories())
         registry.register_from_factories(build_scenario_technique_factories())
-        assert len(registry) == expected
+        assert len(registry.instances) == expected
 
     def test_register_preserves_custom_preregistered(self):
         """Pre-registered custom techniques are not overwritten by re-registration."""
@@ -594,8 +576,8 @@ class TestRegistryIntegration:
 
     def test_tags_assigned_correctly(self):
         registry = AttackTechniqueRegistry.get_registry_singleton()
-        single_turn = {e.name for e in registry.get_by_tag(tag="single_turn")}
-        multi_turn = {e.name for e in registry.get_by_tag(tag="multi_turn")}
+        single_turn = {e.name for e in registry.instances.get_by_tag(tag="single_turn")}
+        multi_turn = {e.name for e in registry.instances.get_by_tag(tag="multi_turn")}
         assert {"role_play"} <= single_turn
         assert {"many_shot", "tap"} <= multi_turn
 
@@ -623,12 +605,12 @@ class TestBuildScenarioTechniqueFactories:
         by_name = {f.name: f for f in build_scenario_technique_factories()}
         assert by_name["role_play"].uses_adversarial is True
         assert by_name["tap"].uses_adversarial is True
-        assert by_name["role_play"]._adversarial_config is None
-        assert by_name["tap"]._adversarial_config is None
+        assert by_name["role_play"]._adversarial_chat is None
+        assert by_name["tap"]._adversarial_chat is None
 
     def test_non_adversarial_factories_have_no_adversarial_config(self):
         by_name = {f.name: f for f in build_scenario_technique_factories()}
-        assert by_name["many_shot"]._adversarial_config is None
+        assert by_name["many_shot"]._adversarial_chat is None
 
     def test_crescendo_simulated_has_seed_technique(self):
         by_name = {f.name: f for f in build_scenario_technique_factories()}
