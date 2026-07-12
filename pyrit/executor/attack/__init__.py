@@ -46,6 +46,7 @@ from pyrit.executor.attack.multi_turn import (
     generate_simulated_conversation_async,
 )
 from pyrit.executor.attack.single_turn import (
+    BestOfNAttack,
     ContextComplianceAttack,
     FlipAttack,
     ManyShotJailbreakAttack,
@@ -67,6 +68,7 @@ __all__ = [
     "AttackStrategy",
     "BargeInAttack",
     "BargeInAttackContext",
+    "BestOfNAttack",
     "ChunkedRequestAttack",
     "ChunkedRequestAttackContext",
     "ContextComplianceAttack",

@@ -3,6 +3,7 @@
 
 """Singe turn attack strategies module."""
 
+from pyrit.executor.attack.single_turn.best_of_n_attack import BestOfNAttack
 from pyrit.executor.attack.single_turn.context_compliance import ContextComplianceAttack
 from pyrit.executor.attack.single_turn.flip_attack import FlipAttack
 from pyrit.executor.attack.single_turn.many_shot_jailbreak import ManyShotJailbreakAttack
@@ -17,6 +18,7 @@ __all__ = [
     "SingleTurnAttackStrategy",
     "SingleTurnAttackContext",
     "PromptSendingAttack",
+    "BestOfNAttack",
     "ContextComplianceAttack",
     "FlipAttack",
     "ManyShotJailbreakAttack",

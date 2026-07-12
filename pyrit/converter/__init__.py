@@ -27,6 +27,7 @@ from pyrit.converter.azure_speech_audio_to_text_converter import AzureSpeechAudi
 from pyrit.converter.azure_speech_text_to_audio_converter import AzureSpeechTextToAudioConverter
 from pyrit.converter.base64_converter import Base64Converter
 from pyrit.converter.base2048_converter import Base2048Converter
+from pyrit.converter.best_of_n_converter import BestOfNConverter
 from pyrit.converter.bidi_converter import BidiConverter
 from pyrit.converter.bin_ascii_converter import BinAsciiConverter
 from pyrit.converter.binary_converter import BinaryConverter
@@ -164,6 +165,7 @@ __all__ = [
     "AzureSpeechTextToAudioConverter",
     "Base2048Converter",
     "Base64Converter",
+    "BestOfNConverter",
     "BidiConverter",
     "BinAsciiConverter",
     "BinaryConverter",

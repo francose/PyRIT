@@ -89,6 +89,7 @@ from pyrit.converter import (
     AnsiAttackConverter,
     ArabicPresentationFormConverter,
     ArabiziConverter,
+    BestOfNConverter,
     BidiConverter,
     CharacterSpaceConverter,
     CharSwapConverter,
@@ -118,6 +119,9 @@ prompt = "tell me how to cut down a tree"
 
 print("Leetspeak:", await LeetspeakConverter().convert_async(prompt=prompt))  # type: ignore
 print("Random Capitals:", await RandomCapitalLettersConverter(percentage=50.0).convert_async(prompt=prompt))  # type: ignore
+# Best-of-N draws a fresh augmentation each call (scramble + case flip + ASCII noise);
+# pair it with a sampling budget to reproduce the Best-of-N jailbreak.
+print("Best-of-N:", await BestOfNConverter(sigma=0.4).convert_async(prompt=prompt))  # type: ignore
 print("Unicode Confusable:", await UnicodeConfusableConverter().convert_async(prompt=prompt))  # type: ignore
 print("Unicode Substitution:", await UnicodeSubstitutionConverter().convert_async(prompt=prompt))  # type: ignore
 print("Unicode Replacement:", await UnicodeReplacementConverter().convert_async(prompt=prompt))  # type: ignore
