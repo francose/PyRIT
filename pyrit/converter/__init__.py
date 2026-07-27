@@ -32,6 +32,7 @@ from pyrit.converter.bin_ascii_converter import BinAsciiConverter
 from pyrit.converter.binary_converter import BinaryConverter
 from pyrit.converter.braille_converter import BrailleConverter
 from pyrit.converter.caesar_converter import CaesarConverter
+from pyrit.converter.char_noise_converter import CharNoiseConverter
 from pyrit.converter.character_space_converter import CharacterSpaceConverter
 from pyrit.converter.charswap_attack_converter import CharSwapConverter
 from pyrit.converter.codechameleon_converter import CodeChameleonConverter
@@ -171,6 +172,7 @@ __all__ = [
     "BinaryConverter",
     "BrailleConverter",
     "CaesarConverter",
+    "CharNoiseConverter",
     "CharSwapConverter",
     "CharacterSpaceConverter",
     "CodeChameleonConverter",

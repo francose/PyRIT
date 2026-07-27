@@ -91,6 +91,7 @@ from pyrit.converter import (
     ArabiziConverter,
     BidiConverter,
     CharacterSpaceConverter,
+    CharNoiseConverter,
     CharSwapConverter,
     CodeChameleonConverter,
     ColloquialWordswapConverter,
@@ -147,6 +148,9 @@ print("Zalgo:", await ZalgoConverter().convert_async(prompt=prompt))  # type: ig
 # CharSwap swaps characters within words
 char_swap = CharSwapConverter(max_iterations=3, word_selection_strategy=WordProportionSelectionStrategy(proportion=0.8))
 print("CharSwap:", await char_swap.convert_async(prompt=prompt))  # type: ignore
+
+# CharNoise nudges printable ASCII characters to an adjacent codepoint
+print("CharNoise:", await CharNoiseConverter(noise_probability=0.2).convert_async(prompt=prompt))  # type: ignore
 
 # Insert punctuation adds punctuation marks
 insert_punct = InsertPunctuationConverter(word_swap_ratio=0.2)

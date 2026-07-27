@@ -10,7 +10,7 @@ Opt-in techniques that are not part of the default ``core`` set. Exposes
 """
 
 from pyrit.common.path import EXECUTOR_RED_TEAM_PATH
-from pyrit.executor.attack import PAIRAttack, RedTeamingAttack, SkeletonKeyAttack
+from pyrit.executor.attack import BestOfNAttack, PAIRAttack, RedTeamingAttack, SkeletonKeyAttack
 from pyrit.models import SeedPrompt
 from pyrit.scenario.core.attack_technique_factory import AttackTechniqueFactory
 
@@ -32,6 +32,12 @@ def get_technique_factories() -> list[AttackTechniqueFactory]:
         AttackTechniqueFactory(
             name="skeleton_key",
             attack_class=SkeletonKeyAttack,
+            technique_tags=["single_turn"],
+        ),
+        AttackTechniqueFactory(
+            name="best_of_n",
+            attack_class=BestOfNAttack,
+            description="Re-samples scrambled, re-cased, noised objective variants until one slips past the target.",
             technique_tags=["single_turn"],
         ),
         AttackTechniqueFactory(
