@@ -85,9 +85,12 @@ class TestBestOfNInitialization:
         attack = BestOfNAttack(objective_target=mock_objective_target, n_samples=8)
         assert attack._max_attempts_on_failure == 7
 
-    def test_rejects_non_positive_sample_budget(self, mock_objective_target):
+    @pytest.mark.parametrize("bad_n_samples", [0, -1, 1.5, True])
+    def test_rejects_invalid_sample_budget(self, mock_objective_target, bad_n_samples):
+        # Must be a positive int: reject non-positive and non-integer (e.g. 1.5 would otherwise
+        # store 0.5 as the retry count and blow up later in range()).
         with pytest.raises(ValueError, match="n_samples must be a positive integer"):
-            BestOfNAttack(objective_target=mock_objective_target, n_samples=0)
+            BestOfNAttack(objective_target=mock_objective_target, n_samples=bad_n_samples)
 
     @pytest.mark.parametrize("bad_sigma", [-0.1, 1.5])
     def test_rejects_out_of_range_sigma(self, mock_objective_target, bad_sigma):

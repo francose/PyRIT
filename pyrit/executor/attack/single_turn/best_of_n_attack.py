@@ -59,9 +59,9 @@ class BestOfNAttack(PromptSendingAttack):
                 has a 1% floor.
 
         Raises:
-            ValueError: If ``n_samples`` is less than 1 or ``sigma`` is outside [0.0, 1.0].
+            ValueError: If ``n_samples`` is not a positive integer or ``sigma`` is outside [0.0, 1.0].
         """
-        if n_samples < 1:
+        if not isinstance(n_samples, int) or isinstance(n_samples, bool) or n_samples < 1:
             raise ValueError("n_samples must be a positive integer")
         if not 0.0 <= sigma <= 1.0:
             raise ValueError("sigma must be between 0.0 and 1.0")
