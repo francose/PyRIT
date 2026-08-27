@@ -32,6 +32,12 @@ async def test_char_noise_full_probability_shifts_letters():
     assert all(" " <= c <= "~" for c in result.output_text)
 
 
+async def test_char_noise_full_probability_shifts_ascii_boundaries():
+    converter = CharNoiseConverter(noise_probability=1.0)
+    result = await converter.convert_async(prompt=" ~", input_type="text")
+    assert result.output_text == "!}"
+
+
 async def test_char_noise_leaves_non_ascii_untouched():
     converter = CharNoiseConverter(noise_probability=1.0)
     result = await converter.convert_async(prompt="cafe naive: éï", input_type="text")

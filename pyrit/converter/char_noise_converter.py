@@ -38,10 +38,12 @@ class CharNoiseConverter(Converter):
     def _noise(self, text: str) -> str:
         out = []
         for ch in text:
-            if " " <= ch <= "~" and random.random() < self.noise_probability:
-                code = ord(ch) + random.choice((-1, 1))
-                if ord(" ") <= code <= ord("~"):
-                    ch = chr(code)
+            if not " " <= ch <= "~" or random.random() >= self.noise_probability:
+                out.append(ch)
+                continue
+
+            offset = 1 if ch == " " else -1 if ch == "~" else random.choice((-1, 1))
+            ch = chr(ord(ch) + offset)
             out.append(ch)
         return "".join(out)
 
