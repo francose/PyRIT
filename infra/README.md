@@ -7,11 +7,11 @@ managed identity, security response headers, and no embedded secrets.
 ## Architecture
 
 ```
-Users ──→ MSAL PKCE auth ──→ Container App
+Users ──→ MSAL PKCE or CLI device-code auth ──→ Container App
                                                        ↓
-                                                 MSAL PKCE auth
+                                          Graph-backed authentication
                                                        ↓
-                                              FastAPI JWT middleware
+                                       Microsoft Graph /me + memberships
                                                        ↓
                                               User-Assigned MI
                                         ↙     ↙     ↓      ↘      ↘
@@ -57,13 +57,18 @@ Production is opt-in via `deployToProd: true`.
 ## Security
 
 - **Authentication**: [MSAL](https://learn.microsoft.com/en-us/entra/msal/)
-  [PKCE](https://oauth.net/2/pkce/) on the frontend (`@azure/msal-browser`) +
-  FastAPI JWT middleware on the backend. Validates Bearer tokens against Entra ID
-  JWKS. PKCE (public client) — no client secrets or certificates needed.
+  [PKCE](https://oauth.net/2/pkce/) on the frontend (`@azure/msal-browser`) and
+  public-client device-code authentication for the PyRIT CLI +
+  Microsoft Graph-backed middleware on the backend. The frontend sends a delegated
+  Graph token, and the backend authenticates it through Graph `/me`. These public-client
+  flows require no client secrets or certificates.
 - **Authorization**: Entra group check via `allowedGroupObjectIds` param. Requires
-  `groupMembershipClaims: "ApplicationGroup"` + optional claims + each security group
-  assigned to the enterprise app (see Prerequisites §3). If no group restriction is
-  set, all authenticated users pass.
+  delegated Graph `User.Read`; the backend calls `/me/checkMemberGroups` and compares
+  the returned transitive memberships with the configured group IDs. Each security
+  group must also be assigned to the enterprise app (see Prerequisites §3). Authenticated
+  deployments require at least one allowed group and fail to start without one.
+  Successful identity and membership results are cached in-process for 60 seconds by
+  token digest to reduce Graph latency and throttling; bearer tokens are never cached.
 - **Identity**: User-assigned managed identity (UAMI) — created before the container
   app so [RBAC](https://learn.microsoft.com/en-us/azure/role-based-access-control/)
   roles are active before the first revision starts. `AZURE_CLIENT_ID` is set to the
@@ -161,41 +166,33 @@ az account show --query tenantId -o tsv
 >   --spa-redirect-uris "https://$FQDN"
 > ```
 
-**Expose an API scope** (required — the frontend requests `api://{clientId}/access` tokens):
+**Configure delegated Microsoft Graph access and public-client login** (required):
 
-1. In Azure Portal → App registrations → your app → **Expose an API**
-2. Set the Application ID URI (accept the default `api://<client-id>`)
-3. **Add a scope**: value = `access`, admin consent display name = "Access PyRIT GUI",
-   who can consent = "Admins and users", state = Enabled
+In Azure Portal → App registrations → your app → **API permissions**:
+
+1. Select **Add a permission** → **Microsoft Graph** → **Delegated permissions**.
+2. Add `User.Read`.
+3. Grant consent according to your tenant policy. `User.Read` does not normally
+   require admin consent, but some tenants disable user consent.
+
+The frontend requests `User.Read`. The backend treats the resulting Graph access
+token as opaque and forwards it only to fixed or allowlisted Graph endpoints. Graph
+validates the token when the backend calls `/me` and `/me/checkMemberGroups`.
 
 Or via CLI:
 ```bash
-# Set application ID URI
+# Add delegated Microsoft Graph User.Read
+# Graph app ID: 00000003-0000-0000-c000-000000000000
+# User.Read delegated permission ID: e1fe6dd8-ba31-4d61-89e7-88639da4683d
 APP_OBJ_ID=$(az ad app show --id $APP_ID --query id -o tsv)
 az rest --method PATCH \
   --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJ_ID" \
-  --body "{\"identifierUris\": [\"api://$APP_ID\"]}"
-
-# Add the 'access' scope (generate a unique GUID for the scope ID)
-SCOPE_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
-az rest --method PATCH \
-  --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJ_ID" \
-  --body "{\"api\":{\"oauth2PermissionScopes\":[{\"id\":\"$SCOPE_ID\",\"isEnabled\":true,\"type\":\"User\",\"value\":\"access\",\"adminConsentDisplayName\":\"Access PyRIT GUI\",\"adminConsentDescription\":\"Allow access to the PyRIT GUI API\",\"userConsentDisplayName\":\"Access PyRIT GUI\",\"userConsentDescription\":\"Allow access to the PyRIT GUI API\"}]}}"
+  --body '{"isFallbackPublicClient":true,"requiredResourceAccess":[{"resourceAppId":"00000003-0000-0000-c000-000000000000","resourceAccess":[{"id":"e1fe6dd8-ba31-4d61-89e7-88639da4683d","type":"Scope"}]}]}'
 ```
 
-**Configure group claims** for group-based authorization:
-
-```bash
-# Set groupMembershipClaims to ApplicationGroup (not SecurityGroup — the latter
-# causes groups overage for users in >200 groups, breaking token-based group checks)
-az rest --method PATCH \
-  --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJ_ID" \
-  --body '{"groupMembershipClaims": "ApplicationGroup"}'
-```
-
-Then add `groups` as an optional claim for both ID tokens and access tokens:
-Azure Portal → App registrations → your app → Token configuration → Add optional
-claim → Token type: Access → check `groups` → Save. Repeat for ID token.
+`isFallbackPublicClient` enables device-code login for `pyrit_scan` and `pyrit_shell`. In the
+Azure Portal, the equivalent setting is **Authentication → Advanced settings → Allow public
+client flows → Yes**.
 
 ### 3. Entra security groups (required for group-based authorization)
 
@@ -219,8 +216,9 @@ az ad group member add --group "MyApp-Users" --member-id <user-object-id>
 az ad group member list --group "MyApp-Users" --query '[].displayName' -o tsv
 ```
 
-**IMPORTANT: Assign each group to the enterprise application.** This is required for
-`ApplicationGroup` to emit group IDs in tokens:
+**IMPORTANT: Assign each group to the enterprise application.** This enables the
+recommended `appRoleAssignmentRequired` sign-in restriction in addition to the
+backend's Graph-based group authorization:
 
 ```bash
 # Get the service principal (enterprise app) object ID
@@ -237,6 +235,10 @@ az rest --method POST \
 az ad sp update --id $SP_ID --set appRoleAssignmentRequired=true
 ```
 
+Enterprise-app assignment restricts sign-in through this SPA, but a Graph token is
+not client-bound at this backend. The configured allowed groups are therefore the
+backend's authoritative security boundary. Never deploy with an empty group list.
+
 **Nested groups**: Entra enterprise app assignment does **not** cascade to nested
 groups. If group A contains group B as a member, only direct members of A are
 considered assigned. To grant access to members of B, assign B to the enterprise
@@ -244,9 +246,9 @@ app separately and include both group IDs in `allowedGroupObjectIds`.
 
 **App roles** (optional): You can define custom app roles on the app registration
 (e.g., `MyApp.User.All`) and assign groups to specific roles instead of the
-default access role. The backend currently authorizes via the `groups` token claim,
-not `roles`, so app roles serve as organizational metadata and for
-`appRoleAssignmentRequired` gating at the IdP level.
+default access role. The backend authorizes using memberships returned by Graph,
+not token `groups` or `roles` claims, so app roles serve as organizational metadata
+and for `appRoleAssignmentRequired` gating at the IdP level.
 
 ### 4. Azure SQL server with Entra admin (existing)
 
@@ -353,13 +355,21 @@ az deployment group create \
 
 ## Post-Deployment
 
-1. **Set SPA redirect URI** on the app registration (requires the FQDN from deploy output):
+1. **Configure browser and CLI public-client authentication** on the app registration:
    ```bash
    FQDN=$(az deployment group show -g <rg> -n main \
      --query properties.outputs.appFqdn.value -o tsv)
    az ad app update --id <entraClientId> \
      --spa-redirect-uris "https://$FQDN"
+
+   APP_OBJ_ID=$(az ad app show --id <entraClientId> --query id -o tsv)
+   az rest --method PATCH \
+     --url "https://graph.microsoft.com/v1.0/applications/$APP_OBJ_ID" \
+     --body '{"isFallbackPublicClient":true}'
    ```
+
+   For an existing deployment, run only the `APP_OBJ_ID` and `az rest` commands once. Do not
+   rerun `infra/deploy_instance.py`; its resource creation steps are not idempotent.
 
 2. **Grant managed identity RBAC** (required — the Bicep template does **not** create
    role assignments; the app will fail to start without AcrPull):
